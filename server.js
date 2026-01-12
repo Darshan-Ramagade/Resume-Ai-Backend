@@ -3,70 +3,29 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-
 import connectDB from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import analysisRoutes from './routes/analysisRoutes.js';
 
-/* =========================
-   Load environment variables
-========================= */
+// Load environment variables
 dotenv.config();
 
-/* =========================
-   Initialize app
-========================= */
+// Initialize Express app
 const app = express();
 
-/* =========================
-   Connect DB
-========================= */
+// Connect to MongoDB
 connectDB();
 
-/* =========================
-   Security headers
-========================= */
+// Middleware
 app.use(helmet());
-
-/* =========================
-   CORS CONFIG (FINAL FIX)
-========================= */
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://resume-aii.netlify.app'
-];
-
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow Postman / server-to-server requests
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS not allowed'));
-    }
-  },
+  origin: process.env.CLIENT_URL || 'https://resume-aii.netlify.app',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
-/* =========================
-   Preflight requests
-========================= */
-app.options('*', cors());
-
-/* =========================
-   Body parsers
-========================= */
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-/* =========================
-   Rate Limiting
-========================= */
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -74,37 +33,30 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
 app.use('/api', limiter);
 
-/* =========================
-   Dev Logger
-========================= */
 if (process.env.NODE_ENV === 'development') {
   app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`);
+    console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
     next();
   });
 }
 
-/* =========================
-   Routes
-========================= */
+// Routes
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Server is running',
-    environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
   });
 });
 
+// Mount authentication routes - THIS IS CRITICAL
 app.use('/api/auth', authRoutes);
 app.use('/api/analyze', analysisRoutes);
 
-/* =========================
-   404 Handler
-========================= */
+// 404 Handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -112,28 +64,22 @@ app.use((req, res) => {
   });
 });
 
-/* =========================
-   Global Error Handler
-========================= */
+// Global Error Handler (must be last)
 app.use(errorHandler);
 
-/* =========================
-   Start Server
-========================= */
+// Start Server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log('='.repeat(50));
-  console.log(`🚀 Server running in ${process.env.NODE_ENV || 'production'} mode`);
-  console.log(`📡 Port: ${PORT}`);
-  console.log(`🏥 Health: /api/health`);
+  console.log(`🚀 Server running in ${process.env.NODE_ENV} mode`);
+  console.log(`📡 Listening on port ${PORT}`);
+  console.log(`🔗 API URL: http://localhost:${PORT}/api`);
+  console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
   console.log('='.repeat(50));
 });
 
-/* =========================
-   Graceful shutdown
-========================= */
 process.on('SIGTERM', () => {
-  console.log('⚠️ SIGTERM received. Shutting down...');
+  console.log('⚠️  SIGTERM received. Shutting down gracefully...');
   process.exit(0);
 });
