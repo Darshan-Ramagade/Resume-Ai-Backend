@@ -13,22 +13,21 @@ dotenv.config();
 
 const app = express();
 
-// Connect DB
+/* ================= DATABASE ================= */
 connectDB();
 
-// Security headers
+/* ================= SECURITY ================= */
 app.use(helmet());
 
-// ✅ FINAL CORS CONFIG (FIXED)
+/* ================= CORS ================= */
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://resume-aii.netlify.app'
+  'https://resume-aii.netlify.app',
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
-    // Allow Postman / server-to-server
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // Postman / server-to-server
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
@@ -39,16 +38,16 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+};
 
-// ✅ REQUIRED for preflight
-app.options('*', cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // ✅ IMPORTANT
 
-// Body parsers
+/* ================= BODY PARSERS ================= */
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Rate limiting
+/* ================= RATE LIMIT ================= */
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -59,7 +58,7 @@ const limiter = rateLimit({
 
 app.use('/api', limiter);
 
-// Dev logger
+/* ================= DEV LOG ================= */
 if (process.env.NODE_ENV === 'development') {
   app.use((req, res, next) => {
     console.log(`${req.method} ${req.path}`);
@@ -67,11 +66,11 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-// Routes
+/* ================= ROUTES ================= */
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Server is running',
+    message: 'Server is running 🚀',
     environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
   });
@@ -80,7 +79,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/analyze', analysisRoutes);
 
-// 404 handler
+/* ================= 404 ================= */
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -88,17 +87,20 @@ app.use((req, res) => {
   });
 });
 
-// Error handler
+/* ================= ERROR HANDLER ================= */
 app.use(errorHandler);
 
-// Start server
+/* ================= START SERVER ================= */
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('='.repeat(40));
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+  console.log('='.repeat(40));
 });
 
-// Graceful shutdown
+/* ================= GRACEFUL SHUTDOWN ================= */
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down...');
   process.exit(0);
